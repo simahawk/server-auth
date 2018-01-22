@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
-# © 2016 Jairo Llopis <jairo.llopis@tecnativa.com>
+# Copyright 2016 Jairo Llopis <jairo.llopis@tecnativa.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from urllib import urlencode
 from lxml.html import document_fromstring
-from openerp import _
-from openerp.tests.common import HttpCase
+from odoo import _
+from odoo.tests.common import HttpCase
+from odoo.tools.misc import mute_logger
 
 
 class UICase(HttpCase):
@@ -39,9 +38,8 @@ class UICase(HttpCase):
 
     def html_doc(self, url="/web/signup", data=None, timeout=10):
         """Get an HTML LXML document."""
-        if data:
-            data = bytes(urlencode(data))
-        return document_fromstring(self.url_open(url, data, timeout).read())
+        resp = self.url_open(url, data=data, timeout=timeout)
+        return document_fromstring(resp.content)
 
     def csrf_token(self):
         """Get a valid CSRF token."""
@@ -54,10 +52,12 @@ class UICase(HttpCase):
 
     def test_bad_email(self):
         """Test rejection of bad emails."""
-        self.data["login"] = "bad email"
-        doc = self.html_doc(data=self.data)
+        data = self.data.copy()
+        data["login"] = "bad email"
+        doc = self.html_doc(data=data)
         self.assertTrue(self.search_text(doc, self.msg["badmail"]))
 
+    @mute_logger('signup_verify_email.controller')
     def test_good_email(self):
         """Test acceptance of good emails.
 
@@ -65,8 +65,9 @@ class UICase(HttpCase):
         to failure otherwise. Any case is expected, since tests usually run
         under unconfigured demo instances.
         """
-        self.data["login"] = "good@example.com"
-        doc = self.html_doc(data=self.data)
+        data = self.data.copy()
+        data["login"] = "good@example.com"
+        doc = self.html_doc(data=data)
         self.assertTrue(
             self.search_text(doc, self.msg["failure"]) or
             self.search_text(doc, self.msg["success"]))

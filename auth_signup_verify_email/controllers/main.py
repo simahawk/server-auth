@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
-# © 2015 Antiun Ingeniería, S.L.
+# Copyright 2015 Antiun Ingeniería, S.L.
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 import logging
 from odoo import _, http
 from odoo.addons.auth_signup.controllers.main import AuthSignupHome
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger('signup_verify_email.controller')
 
 try:
     from validate_email import validate_email
@@ -15,6 +14,7 @@ except ImportError:
 
 
 class SignupVerifyEmail(AuthSignupHome):
+
     @http.route()
     def web_auth_signup(self, *args, **kw):
         if (http.request.params.get("login") and

@@ -23,12 +23,24 @@ class SignupVerifyEmail(AuthSignupHome):
         else:
             return super(SignupVerifyEmail, self).web_auth_signup(*args, **kw)
 
+    @property
+    def msg_invalid_email_error(self):
+        return _("That does not seem to be an email address.")
+
+    @property
+    def msg_something_wrong_error(self):
+        return _("Something went wrong, please try again later or contact us.")
+
+    @property
+    def msg_check_inbox_info(self):
+        return _("Check your email to activate your account!")
+
     def passwordless_signup(self, values):
         qcontext = self.get_auth_signup_qcontext()
 
         # Check good format of e-mail
         if not validate_email(values.get("login", "")):
-            qcontext["error"] = _("That does not seem to be an email address.")
+            qcontext["error"] = self.msg_invalid_email_error
             return http.request.render("auth_signup.signup", qcontext)
         elif not values.get("email"):
             values["email"] = values.get("login")
@@ -47,9 +59,8 @@ class SignupVerifyEmail(AuthSignupHome):
             _logger.exception(error)
 
             # Agnostic message for security
-            qcontext["error"] = _(
-                "Something went wrong, please try again later or contact us.")
+            qcontext["error"] = self.msg_something_wrong_error
             return http.request.render("auth_signup.signup", qcontext)
 
-        qcontext["message"] = _("Check your email to activate your account!")
+        qcontext["message"] = self.msg_check_inbox_info
         return http.request.render("auth_signup.reset_password", qcontext)

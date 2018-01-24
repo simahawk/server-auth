@@ -5,6 +5,7 @@ from odoo import _
 from odoo.tests.common import HttpCase
 from odoo.tools.misc import mute_logger
 from lxml.html import document_fromstring
+import mock
 
 
 class SignupVerifyEmailCase(HttpCase):
@@ -14,6 +15,14 @@ class SignupVerifyEmailCase(HttpCase):
 
     def setUp(self):
         super(SignupVerifyEmailCase, self).setUp()
+        # do it here, otherwise is not going to have any effect :(
+        self.opener.cookies['frontend_lang'] = 'fr_FR'
+
+        lang = self.env['res.lang'].with_context(active_test=0).search([
+            ('code', '=', 'fr_FR'), ('active', '=', False)], limit=1)
+        if lang:
+            lang.active = True
+
         self.msg = {
             "badmail": _("That does not seem to be an email address."),
             "failure": _(
@@ -24,6 +33,16 @@ class SignupVerifyEmailCase(HttpCase):
             type(self.env["ir.config_parameter"]),
             'get_param',
             self._fake_get_param)
+
+        self.patch(
+            type(self.env["ir.http"]),
+            '_get_language_codes',
+            self._fake_get_language_codes
+        )
+
+    @classmethod
+    def _fake_get_language_codes(cls):
+        return [('en_US', 'English'), ('fr_FR', 'French')]
 
     def patch(self, obj, key, val):
         """Overidden to keep old method."""
@@ -80,3 +99,15 @@ class SignupVerifyEmailCase(HttpCase):
         self.assertTrue(
             self.search_text(doc, self.msg["failure"]) or
             self.search_text(doc, self.msg["success"]))
+
+    @mute_logger('signup_verify_email.controller')
+    def test_user_lang_preserved(self):
+        """In multilang websites the language must be preserved on the user."""
+        data = self.user_data.copy()
+        data["login"] = "keeplang@example.com"
+        to_patch_signup = \
+            'odoo.addons.auth_signup.models.res_users.ResUsers.signup'
+        with mock.patch(to_patch_signup) as patched:
+            self.html_doc(url='/fr_FR/web/signup', data=data)
+            patched.assert_called()
+            self.assertEqual(patched.call_args[0][0]['lang'], 'fr_FR')

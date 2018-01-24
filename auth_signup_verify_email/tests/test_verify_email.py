@@ -1,40 +1,49 @@
 # Copyright 2016 Jairo Llopis <jairo.llopis@tecnativa.com>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from lxml.html import document_fromstring
 from odoo import _
 from odoo.tests.common import HttpCase
 from odoo.tools.misc import mute_logger
+from lxml.html import document_fromstring
 
 
-class UICase(HttpCase):
+class SignupVerifyEmailCase(HttpCase):
+
+    post_install = True
+    at_install = False
+
     def setUp(self):
-        super(UICase, self).setUp()
-        self.icp = self.env["ir.config_parameter"]
-        self.old_allow_uninvited = self.icp.get_param(
-            "auth_signup.allow_uninvited")
-        self.icp.set_param("auth_signup.allow_uninvited", "True")
-
-        # Workaround https://github.com/odoo/odoo/issues/12237
-        self.cr.commit()
-
-        self.data = {
-            "csrf_token": self.csrf_token(),
-            "name": "Somebody",
-        }
+        super(SignupVerifyEmailCase, self).setUp()
         self.msg = {
             "badmail": _("That does not seem to be an email address."),
             "failure": _(
                 "Something went wrong, please try again later or contact us."),
             "success": _("Check your email to activate your account!"),
         }
+        self.patch(
+            type(self.env["ir.config_parameter"]),
+            'get_param',
+            self._fake_get_param)
 
-    def tearDown(self):
-        """Workaround https://github.com/odoo/odoo/issues/12237."""
-        super(UICase, self).tearDown()
-        self.icp.set_param(
-            "auth_signup.allow_uninvited", self.old_allow_uninvited)
-        self.cr.commit()
+    def patch(self, obj, key, val):
+        """Overidden to keep old method."""
+        old = getattr(obj, key)
+        setattr(obj, key, val)
+        setattr(obj, 'old_' + key, old)
+        self.addCleanup(setattr, obj, key, old)
+
+    def _fake_get_param(self, key, default=False):
+        if key == 'auth_signup.allow_uninvited':
+            return 'True'
+        return self.env["ir.config_parameter"].old_get_param(
+            key, default=default)
+
+    @property
+    def user_data(self):
+        return {
+            "csrf_token": self.csrf_token(),
+            "name": "Somebody",
+        }
 
     def html_doc(self, url="/web/signup", data=None, timeout=10):
         """Get an HTML LXML document."""
@@ -52,7 +61,7 @@ class UICase(HttpCase):
 
     def test_bad_email(self):
         """Test rejection of bad emails."""
-        data = self.data.copy()
+        data = self.user_data.copy()
         data["login"] = "bad email"
         doc = self.html_doc(data=data)
         self.assertTrue(self.search_text(doc, self.msg["badmail"]))
@@ -65,7 +74,7 @@ class UICase(HttpCase):
         to failure otherwise. Any case is expected, since tests usually run
         under unconfigured demo instances.
         """
-        data = self.data.copy()
+        data = self.user_data.copy()
         data["login"] = "good@example.com"
         doc = self.html_doc(data=data)
         self.assertTrue(

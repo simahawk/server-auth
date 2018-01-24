@@ -46,6 +46,9 @@ class SignupVerifyEmail(AuthSignupHome):
         elif not values.get("email"):
             values["email"] = values.get("login")
 
+        # preserve user lang
+        values['lang'] = self._get_user_lang()
+
         # Remove password
         values["password"] = ""
         sudo_users = (request.env["res.users"]
@@ -65,3 +68,18 @@ class SignupVerifyEmail(AuthSignupHome):
 
         qcontext["message"] = self.msg_check_inbox_info
         return request.render("auth_signup.reset_password", qcontext)
+
+    def _get_user_lang(self):
+        """Retrieve current user language."""
+        langs = request.env['res.lang'].search_read([], ['code'])
+        supported_langs = [
+            lang['code'] for lang in langs
+        ]
+        lang = 'en_US'  # fallback
+        if hasattr(request, 'website'):
+            # default to site lang
+            lang = request.website.default_lang_code
+        if request.lang in supported_langs:
+            # get request lang
+            lang = request.lang
+        return lang
